@@ -502,7 +502,7 @@ const Assets = () => {
                 <Label htmlFor="environment">Environment</Label>
                 <Select value={newAsset.environment} onValueChange={(value) => setNewAsset({...newAsset, environment: value})}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select environment" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="production">Production</SelectItem>
