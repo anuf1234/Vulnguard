@@ -1280,7 +1280,7 @@ const Findings = () => {
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Types</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="vulnerability">Vulnerabilities</SelectItem>
               <SelectItem value="misconfiguration">Misconfigurations</SelectItem>
               <SelectItem value="compliance">Compliance</SelectItem>
