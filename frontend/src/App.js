@@ -1153,8 +1153,8 @@ const Findings = () => {
   const [showRemediationDialog, setShowRemediationDialog] = useState(false);
   const [remediation, setRemediation] = useState(null);
   const [filters, setFilters] = useState({
-    severity: '',
-    finding_type: '',
+    severity: 'all',
+    finding_type: 'all',
     cross_host: false
   });
 
