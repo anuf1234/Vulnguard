@@ -478,7 +478,7 @@ const Assets = () => {
                 <Label htmlFor="asset_type">Asset Type</Label>
                 <Select value={newAsset.asset_type} onValueChange={(value) => setNewAsset({...newAsset, asset_type: value})}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select asset type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="server">Server</SelectItem>
