@@ -459,8 +459,8 @@ const Assets = () => {
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [filters, setFilters] = useState({
-    environment: '',
-    business_unit: ''
+    environment: 'all',
+    business_unit: 'all'
   });
   const [newAsset, setNewAsset] = useState({
     hostname: '',
