@@ -124,10 +124,7 @@ class VulnGuardAPITester:
 
     def test_network_scan(self):
         """Test network scanning functionality"""
-        scan_data = {
-            "targets": ["192.168.1.1", "192.168.1.100"],
-            "scan_name": f"Test Network Scan {int(time.time())}"
-        }
+        scan_data = ["192.168.1.1", "192.168.1.100"]
         
         success, data, status = self.make_request('POST', '/scan/network', scan_data)
         
