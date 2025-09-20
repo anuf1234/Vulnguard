@@ -1688,7 +1688,7 @@ const AuditTrail = () => {
               <SelectValue placeholder="Filter by action" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Actions</SelectItem>
+              <SelectItem value="all">All Actions</SelectItem>
               <SelectItem value="create">Create</SelectItem>
               <SelectItem value="scan">Scan</SelectItem>
               <SelectItem value="approve">Approve</SelectItem>
