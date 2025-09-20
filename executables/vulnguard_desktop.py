@@ -28,7 +28,7 @@ class VulnGuardDesktop:
         self.root.configure(bg='#f0f0f0')
         
         # Configuration
-        self.server_url = os.getenv('VULNGUARD_SERVER', 'https://vulnguard-3.preview.emergentagent.com')
+        self.server_url = os.getenv('VULNGUARD_SERVER', 'https://securityscan-15.preview.emergentagent.com')
         self.api_key = os.getenv('VULNGUARD_API_KEY', '')
         
         # Queue for thread communication

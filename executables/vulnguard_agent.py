@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class VulnGuardAgent:
     def __init__(self, server_url=None, api_key=None):
-        self.server_url = server_url or os.getenv('VULNGUARD_SERVER', 'https://vulnguard-3.preview.emergentagent.com')
+        self.server_url = server_url or os.getenv('VULNGUARD_SERVER', 'https://securityscan-15.preview.emergentagent.com')
         self.api_key = api_key or os.getenv('VULNGUARD_API_KEY', '')
         self.hostname = socket.gethostname()
         self.platform = platform.system()
