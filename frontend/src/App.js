@@ -1166,8 +1166,8 @@ const Findings = () => {
   const fetchFindings = async () => {
     try {
       const params = new URLSearchParams();
-      if (filters.severity) params.append('severity', filters.severity);
-      if (filters.finding_type) params.append('finding_type', filters.finding_type);
+      if (filters.severity && filters.severity !== 'all') params.append('severity', filters.severity);
+      if (filters.finding_type && filters.finding_type !== 'all') params.append('finding_type', filters.finding_type);
       if (filters.cross_host) params.append('cross_host', 'true');
       
       const response = await axios.get(`${API}/findings?${params}`);
