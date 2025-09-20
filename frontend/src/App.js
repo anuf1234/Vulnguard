@@ -917,7 +917,7 @@ const Findings = () => {
   const fetchFindings = async () => {
     try {
       const params = new URLSearchParams();
-      if (filters.severity) params.append('severity', filters.severity);
+      if (filters.severity && filters.severity !== 'all') params.append('severity', filters.severity);
       if (filters.asset_id) params.append('asset_id', filters.asset_id);
       
       const response = await axios.get(`${API}/findings?${params}`);
