@@ -722,6 +722,11 @@ const Scans = () => {
       
       toast.success(`Network scan initiated: ${response.data.findings_count} findings discovered`);
       setShowNewScan(false);
+      setNewScan({
+        name: '',
+        targets: '',
+        scan_type: 'network'
+      });
       fetchScans();
     } catch (error) {
       console.error('Network scan failed:', error);
