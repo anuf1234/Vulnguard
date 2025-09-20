@@ -515,7 +515,7 @@ const Assets = () => {
                 <Label htmlFor="criticality">Criticality (1-5)</Label>
                 <Select value={newAsset.criticality.toString()} onValueChange={(value) => setNewAsset({...newAsset, criticality: parseInt(value)})}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select criticality" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="1">1 - Critical</SelectItem>
