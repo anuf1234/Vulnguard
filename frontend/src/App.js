@@ -1275,7 +1275,7 @@ const Findings = () => {
               <SelectItem value="low">Low</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filters.finding_type || undefined} onValueChange={(value) => setFilters({...filters, finding_type: value})}>
+          <Select value={filters.finding_type} onValueChange={(value) => setFilters({...filters, finding_type: value})}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
