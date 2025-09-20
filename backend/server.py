@@ -556,9 +556,12 @@ async def calculate_finding_risk(finding_id: str):
 
 # Network Discovery Simulation
 @api_router.post("/scan/network")
-async def simulate_network_scan(targets: List[str], scan_name: str = "Network Discovery"):
+async def simulate_network_scan(request_data: Dict[str, Any]):
     """Simulate network vulnerability scanning"""
     try:
+        targets = request_data.get("targets", [])
+        scan_name = request_data.get("scan_name", "Network Discovery")
+        
         scan_job = ScanJob(
             name=scan_name,
             scan_type=ScanType.NETWORK,
