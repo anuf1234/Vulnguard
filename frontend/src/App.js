@@ -1683,7 +1683,7 @@ const AuditTrail = () => {
           <p className="text-muted-foreground">Complete security operations audit log</p>
         </div>
         <div className="flex gap-2">
-          <Select value={filters.action || undefined} onValueChange={(value) => setFilters({...filters, action: value})}>
+          <Select value={filters.action} onValueChange={(value) => setFilters({...filters, action: value})}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by action" />
             </SelectTrigger>
