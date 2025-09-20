@@ -1263,7 +1263,7 @@ const Findings = () => {
           <p className="text-muted-foreground">AI-powered vulnerability analysis with automated Ansible remediation</p>
         </div>
         <div className="flex gap-2">
-          <Select value={filters.severity || undefined} onValueChange={(value) => setFilters({...filters, severity: value})}>
+          <Select value={filters.severity} onValueChange={(value) => setFilters({...filters, severity: value})}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by severity" />
             </SelectTrigger>
