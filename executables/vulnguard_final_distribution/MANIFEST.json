@@ -1,0 +1,15 @@
+{
+  "distribution": "VulnGuard Final Distribution v2.0",
+  "contents": {
+    "README.md": "Main documentation and setup guide",
+    "VERSION.json": "Version information and system requirements",
+    "windows/": "Windows executables and batch files",
+    "linux/": "Linux shell scripts and Python source code"
+  },
+  "installation": {
+    "extract": "tar -xf vulnguard-v2.0-final-distribution.tar",
+    "windows": "cd vulnguard_final_distribution/windows && quick_start.bat",
+    "linux": "cd vulnguard_final_distribution/linux && ./quick_start.sh"
+  },
+  "checksum": "SHA256 checksums available in CHECKSUMS.txt"
+}
