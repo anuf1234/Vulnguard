@@ -535,7 +535,7 @@ const Assets = () => {
           <p className="text-muted-foreground">Manage infrastructure assets with compliance tracking</p>
         </div>
         <div className="flex gap-2">
-          <Select value={filters.environment} onValueChange={(value) => setFilters({...filters, environment: value})}>
+          <Select value={filters.environment || undefined} onValueChange={(value) => setFilters({...filters, environment: value})}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Filter by environment" />
             </SelectTrigger>
