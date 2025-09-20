@@ -905,7 +905,7 @@ const Findings = () => {
   const [showRemediationDialog, setShowRemediationDialog] = useState(false);
   const [remediation, setRemediation] = useState(null);
   const [filters, setFilters] = useState({
-    severity: '',
+    severity: 'all',
     asset_id: ''
   });
 
