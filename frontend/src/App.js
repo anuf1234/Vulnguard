@@ -482,8 +482,8 @@ const Assets = () => {
   const fetchAssets = async () => {
     try {
       const params = new URLSearchParams();
-      if (filters.environment) params.append('environment', filters.environment);
-      if (filters.business_unit) params.append('business_unit', filters.business_unit);
+      if (filters.environment && filters.environment !== 'all') params.append('environment', filters.environment);
+      if (filters.business_unit && filters.business_unit !== 'all') params.append('business_unit', filters.business_unit);
       
       const response = await axios.get(`${API}/assets?${params}`);
       setAssets(response.data);
