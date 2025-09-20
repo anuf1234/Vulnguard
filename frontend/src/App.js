@@ -1642,8 +1642,8 @@ const AuditTrail = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    action: '',
-    resource_type: ''
+    action: 'all',
+    resource_type: 'all'
   });
 
   useEffect(() => {
