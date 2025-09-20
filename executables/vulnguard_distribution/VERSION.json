@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "release": "2024.12",
+  "build_platform": "Linux",
+  "build_architecture": "aarch64",
+  "features": [
+    "AI-powered vulnerability analysis",
+    "Ansible remediation automation",
+    "Cross-host vulnerability tracking",
+    "Change management workflows",
+    "Enterprise ticketing integration",
+    "Compliance framework support",
+    "Real-time security dashboards"
+  ],
+  "supported_platforms": [
+    "Windows 10+",
+    "Linux (Ubuntu 18.04+)",
+    "CentOS 7+"
+  ],
+  "components": {
+    "agent": "Security scanning agent with AI analysis",
+    "cli": "Command-line interface for automation",
+    "desktop": "Professional GUI application",
+    "installer": "Complete platform installer"
+  }
+}
