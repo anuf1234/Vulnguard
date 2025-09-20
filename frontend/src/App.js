@@ -540,7 +540,7 @@ const Assets = () => {
               <SelectValue placeholder="Filter by environment" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Environments</SelectItem>
+              <SelectItem value="all">All Environments</SelectItem>
               <SelectItem value="production">Production</SelectItem>
               <SelectItem value="staging">Staging</SelectItem>
               <SelectItem value="development">Development</SelectItem>
