@@ -101,7 +101,6 @@ import {
   Crown,
   Award,
   Briefcase,
-  PieChart,
   Radar,
   Flame,
   Crosshair,
