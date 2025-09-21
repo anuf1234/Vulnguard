@@ -3,6 +3,46 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import axios from 'axios';
 import './App.css';
 
+// Enhanced state for comprehensive features
+const useComplianceState = () => {
+  const [complianceFrameworks, setComplianceFrameworks] = useState([]);
+  const [complianceAssessments, setComplianceAssessments] = useState([]);
+  const [gapAnalysis, setGapAnalysis] = useState(null);
+  
+  return {
+    complianceFrameworks,
+    setComplianceFrameworks,
+    complianceAssessments,
+    setComplianceAssessments,
+    gapAnalysis,
+    setGapAnalysis
+  };
+};
+
+const useRiskState = () => {
+  const [riskAssessments, setRiskAssessments] = useState([]);
+  const [prioritizedFindings, setPrioritizedFindings] = useState([]);
+  
+  return {
+    riskAssessments,
+    setRiskAssessments,
+    prioritizedFindings,
+    setPrioritizedFindings
+  };
+};
+
+const useRemediationState = () => {
+  const [remediationTemplates, setRemediationTemplates] = useState([]);
+  const [automatedRemediations, setAutomatedRemediations] = useState([]);
+  
+  return {
+    remediationTemplates,
+    setRemediationTemplates,
+    automatedRemediations,
+    setAutomatedRemediations
+  };
+};
+
 // Icons
 import { 
   Shield, 
