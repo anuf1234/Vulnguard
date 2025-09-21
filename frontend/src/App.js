@@ -114,7 +114,6 @@ import {
   CloudCog,
   HardDrive,
   Wifi,
-  Router,
   Smartphone,
   Laptop,
   TabletSmartphone
