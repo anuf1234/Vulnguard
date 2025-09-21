@@ -1958,6 +1958,590 @@ const Reports = () => {
   );
 };
 
+// === COMPLIANCE MANAGEMENT COMPONENT ===
+const ComplianceManagement = () => {
+  const [frameworks, setFrameworks] = useState([]);
+  const [selectedFramework, setSelectedFramework] = useState('');
+  const [controls, setControls] = useState([]);
+  const [gapAnalysis, setGapAnalysis] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('frameworks');
+
+  useEffect(() => {
+    fetchFrameworks();
+    fetchAssessments();
+  }, []);
+
+  const fetchFrameworks = async () => {
+    try {
+      const response = await axios.get(`${API}/compliance/frameworks`);
+      setFrameworks(response.data.frameworks);
+    } catch (error) {
+      console.error('Failed to fetch frameworks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFrameworkControls = async (frameworkId) => {
+    try {
+      const response = await axios.get(`${API}/compliance/frameworks/${frameworkId}/controls`);
+      setControls(response.data.controls);
+    } catch (error) {
+      console.error('Failed to fetch controls:', error);
+    }
+  };
+
+  const performGapAnalysis = async (framework) => {
+    try {
+      const response = await axios.get(`${API}/compliance/gap-analysis/${framework}`);
+      setGapAnalysis(response.data);
+    } catch (error) {
+      console.error('Failed to perform gap analysis:', error);
+    }
+  };
+
+  const fetchAssessments = async () => {
+    try {
+      const response = await axios.get(`${API}/compliance/assessments`);
+      setAssessments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch assessments:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Compliance Management</h1>
+          <p className="text-muted-foreground">Automated compliance mapping and gap analysis</p>
+        </div>
+        <Button>
+          <Award className="h-4 w-4 mr-2" />
+          New Assessment
+        </Button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          {[
+            { id: 'frameworks', name: 'Frameworks', icon: BookOpen },
+            { id: 'gap-analysis', name: 'Gap Analysis', icon: Radar },
+            { id: 'assessments', name: 'Assessments', icon: CheckSquare }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === tab.id
+                  ? 'border-red-500 text-red-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <tab.icon className="h-4 w-4 mr-2" />
+              {tab.name}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Frameworks Tab */}
+      {activeTab === 'frameworks' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {frameworks.map((framework) => (
+              <Card key={framework.id} className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => {
+                      setSelectedFramework(framework.id);
+                      fetchFrameworkControls(framework.id);
+                    }}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                      <Shield className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{framework.name}</CardTitle>
+                      <CardDescription className="text-sm">{framework.controls_count} controls</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{framework.description}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      performGapAnalysis(framework.id);
+                      setActiveTab('gap-analysis');
+                    }}
+                  >
+                    <Radar className="h-4 w-4 mr-2" />
+                    Analyze Gaps
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Framework Controls */}
+          {selectedFramework && controls.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Framework Controls - {frameworks.find(f => f.id === selectedFramework)?.name}</CardTitle>
+                <CardDescription>Detailed control requirements and implementation guidance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {controls.map((control) => (
+                    <div key={control.control_id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant={control.priority === 'critical' ? 'destructive' : 
+                                        control.priority === 'high' ? 'secondary' : 'outline'}>
+                            {control.priority}
+                          </Badge>
+                          <h4 className="font-medium">{control.control_id}: {control.title}</h4>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2 mb-3">{control.family}</p>
+                      <p className="text-sm">{control.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Gap Analysis Tab */}
+      {activeTab === 'gap-analysis' && gapAnalysis && (
+        <div className="space-y-6">
+          {/* Compliance Score Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5" />
+                Compliance Score - {gapAnalysis.framework.replace('_', ' ').toUpperCase()}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-green-600">{gapAnalysis.compliance_score}%</div>
+                  <p className="text-sm text-muted-foreground">Overall Compliance</p>
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-green-600">Compliant: {gapAnalysis.compliant_controls}</span>
+                    <span className="text-yellow-600">Partial: {gapAnalysis.partial_compliance}</span>
+                    <span className="text-red-600">Non-compliant: {gapAnalysis.non_compliant_controls}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 h-3 rounded-full"
+                      style={{width: `${gapAnalysis.compliance_score}%`}}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Control Status Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(gapAnalysis.control_details).slice(0, 9).map(([controlId, details]) => (
+              <Card key={controlId} className={`border-l-4 ${
+                details.status === 'compliant' ? 'border-l-green-500' :
+                details.status === 'partial' ? 'border-l-yellow-500' : 'border-l-red-500'
+              }`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium">{controlId}</CardTitle>
+                    <Badge variant={details.status === 'compliant' ? 'default' : 
+                                  details.status === 'partial' ? 'secondary' : 'destructive'}>
+                      {details.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs">{details.control_title}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span>Findings: {details.findings_count}</span>
+                      <span className="text-red-600">Critical: {details.critical_findings}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{details.control_family}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Recommendations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Crosshair className="h-5 w-5" />
+                Remediation Recommendations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {gapAnalysis.recommendations.map((rec, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">{rec}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Assessments Tab */}
+      {activeTab === 'assessments' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Compliance Assessments</CardTitle>
+              <CardDescription>Track formal compliance assessments and audits</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {assessments.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-muted-foreground">No assessments created yet</p>
+                  <Button className="mt-4">
+                    <Award className="h-4 w-4 mr-2" />
+                    Create First Assessment
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {assessments.map((assessment) => (
+                    <div key={assessment.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">{assessment.assessment_name}</h4>
+                          <p className="text-sm text-muted-foreground">{assessment.framework} • {assessment.scope_description}</p>
+                        </div>
+                        <Badge variant={assessment.status === 'completed' ? 'default' : 'secondary'}>
+                          {assessment.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// === RISK PRIORITIZATION COMPONENT ===
+const RiskPrioritization = () => {
+  const [prioritizedFindings, setPrioritizedFindings] = useState([]);
+  const [riskMetrics, setRiskMetrics] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [selectedFinding, setSelectedFinding] = useState(null);
+  const [showRiskDialog, setShowRiskDialog] = useState(false);
+
+  useEffect(() => {
+    fetchPrioritizedFindings();
+  }, []);
+
+  const fetchPrioritizedFindings = async () => {
+    try {
+      const response = await axios.get(`${API}/risk/prioritized-findings`);
+      setPrioritizedFindings(response.data.prioritized_findings);
+      setRiskMetrics(response.data);
+    } catch (error) {
+      console.error('Failed to fetch prioritized findings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateRisk = async (findingId) => {
+    try {
+      const response = await axios.post(`${API}/risk/calculate`, {
+        finding_id: findingId,
+        cvss_score: 7.5,
+        epss_score: 0.3,
+        kev_listed: false,
+        asset_criticality: 'high',
+        business_impact: 'high'
+      });
+      
+      // Refresh findings after risk calculation
+      fetchPrioritizedFindings();
+      
+      return response.data;
+    } catch (error) {
+      console.error('Failed to calculate risk:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Risk-Based Prioritization</h1>
+          <p className="text-muted-foreground">AI-powered vulnerability risk assessment and prioritization</p>
+        </div>
+        <Button onClick={() => fetchPrioritizedFindings()}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Analysis
+        </Button>
+      </div>
+
+      {/* Risk Metrics Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Total Findings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Flame className="h-8 w-8 text-red-500" />
+              <div>
+                <div className="text-2xl font-bold">{riskMetrics.total_findings || 0}</div>
+                <p className="text-sm text-muted-foreground">Risk assessed</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Critical Risk</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-8 w-8 text-purple-500" />
+              <div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {prioritizedFindings.filter(f => f.risk_score >= 0.8).length}
+                </div>
+                <p className="text-sm text-muted-foreground">Immediate action</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">High Risk</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-8 w-8 text-orange-500" />
+              <div>
+                <div className="text-2xl font-bold text-orange-600">
+                  {prioritizedFindings.filter(f => f.risk_score >= 0.6 && f.risk_score < 0.8).length}
+                </div>
+                <p className="text-sm text-muted-foreground">7-day SLA</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Avg Risk Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Gauge className="h-8 w-8 text-blue-500" />
+              <div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {prioritizedFindings.length > 0 
+                    ? (prioritizedFindings.reduce((sum, f) => sum + f.risk_score, 0) / prioritizedFindings.length * 100).toFixed(0)
+                    : 0}%
+                </div>
+                <p className="text-sm text-muted-foreground">Risk level</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Prioritized Findings Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Risk-Prioritized Findings
+          </CardTitle>
+          <CardDescription>Findings ranked by comprehensive risk assessment</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {prioritizedFindings.map((finding, index) => (
+              <div key={finding.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-gray-600">#{finding.priority_rank}</div>
+                      <div className="text-xs text-muted-foreground">Rank</div>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">{finding.title}</h4>
+                        <Badge variant={finding.severity === 'critical' ? 'destructive' : 
+                                      finding.severity === 'high' ? 'secondary' : 'outline'}>
+                          {finding.severity}
+                        </Badge>
+                        {finding.cve_ids.length > 0 && (
+                          <Badge variant="outline">
+                            {finding.cve_ids.length} CVE{finding.cve_ids.length > 1 ? 's' : ''}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">Asset ID: {finding.asset_id}</p>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="flex items-center gap-2">
+                        <div className={`text-lg font-bold ${
+                          finding.risk_score >= 0.8 ? 'text-purple-600' :
+                          finding.risk_score >= 0.6 ? 'text-red-600' :
+                          finding.risk_score >= 0.4 ? 'text-orange-600' : 'text-yellow-600'
+                        }`}>
+                          {Math.round(finding.risk_score * 100)}%
+                        </div>
+                        <div className={`w-3 h-3 rounded-full ${
+                          finding.risk_score >= 0.8 ? 'bg-purple-500' :
+                          finding.risk_score >= 0.6 ? 'bg-red-500' :
+                          finding.risk_score >= 0.4 ? 'bg-orange-500' : 'bg-yellow-500'
+                        }`}></div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">Risk Score</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm"
+                            onClick={() => calculateRisk(finding.id)}>
+                      <Crosshair className="h-4 w-4 mr-2" />
+                      Recalculate
+                    </Button>
+                    <Button variant="outline" size="sm"
+                            onClick={() => {
+                              setSelectedFinding(finding);
+                              setShowRiskDialog(true);
+                            }}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Details
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Risk Factors Legend */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Risk Assessment Methodology
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-3">Risk Factors</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span>CVSS Base Score</span>
+                  <span className="text-muted-foreground">25% weight</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>EPSS Exploit Likelihood</span>
+                  <span className="text-muted-foreground">20% weight</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Asset Business Criticality</span>
+                  <span className="text-muted-foreground">20% weight</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>CISA KEV Catalog</span>
+                  <span className="text-muted-foreground">15% weight</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Business Impact</span>
+                  <span className="text-muted-foreground">10% weight</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Compensating Controls</span>
+                  <span className="text-muted-foreground">-10% weight</span>
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-medium mb-3">Priority Categories</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                  <span>Critical (80-100%): Immediate action required</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span>High (60-79%): 7-day remediation SLA</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                  <span>Medium (40-59%): 30-day remediation SLA</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <span>Low (0-39%): 90-day remediation SLA</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // Main App Component
 function App() {
   return (
