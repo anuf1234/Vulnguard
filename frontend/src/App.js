@@ -195,6 +195,8 @@ const Navigation = () => {
     { path: '/assets', icon: Server, label: 'Assets' },
     { path: '/findings', icon: AlertTriangle, label: 'Findings' },
     { path: '/scans', icon: Search, label: 'Scans' },
+    { path: '/compliance', icon: Shield, label: 'Compliance', isNew: true },
+    { path: '/risk-prioritization', icon: Flame, label: 'Risk Priority', isNew: true },
     { path: '/remediation', icon: Code, label: 'Remediation' },
     { path: '/change-management', icon: GitBranch, label: 'Change Mgmt' },
     { path: '/audit', icon: History, label: 'Audit Trail' },
