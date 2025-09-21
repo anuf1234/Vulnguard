@@ -1675,10 +1675,10 @@ async def get_prioritized_findings(
             {
                 "id": finding["id"],
                 "title": finding["title"],
-                "severity": finding["severity"],
+                "severity": finding.get("severity", "medium"),
                 "risk_score": finding.get("risk_score", 0.5),
                 "asset_id": finding["asset_id"],
-                "finding_type": finding["finding_type"],
+                "finding_type": finding.get("finding_type", "vulnerability"),
                 "cve_ids": finding.get("cve_ids", []),
                 "priority_rank": idx + 1
             }
