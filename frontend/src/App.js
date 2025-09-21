@@ -2557,6 +2557,8 @@ function App() {
             <Route path="/change-management" element={<ChangeManagement />} />
             <Route path="/audit" element={<AuditTrail />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/compliance" element={<ComplianceManagement />} />
+            <Route path="/risk-prioritization" element={<RiskPrioritization />} />
           </Routes>
         </main>
         <Toaster />
