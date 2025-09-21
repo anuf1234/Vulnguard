@@ -223,6 +223,224 @@ class ConfigurationBaseline(BaseModel):
     compliance_framework: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# === COMPLIANCE MAPPING FRAMEWORK ===
+
+class ComplianceFramework(str, Enum):
+    NIST_800_53 = "nist_800_53"
+    ISO_27001 = "iso_27001"
+    HIPAA = "hipaa"
+    FEDRAMP = "fedramp"
+    SOC2 = "soc2"
+    PCI_DSS = "pci_dss" 
+    CIS = "cis"
+    GDPR = "gdpr"
+    CMMC = "cmmc"
+
+class ComplianceControl(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    framework: ComplianceFramework
+    control_id: str  # e.g., "AC-2", "A.9.2.1", "45 CFR 164.308(a)(4)"
+    control_title: str
+    control_description: str
+    control_family: Optional[str] = None  # e.g., "Access Control", "Cryptography"
+    implementation_guidance: Optional[str] = None
+    assessment_procedures: List[str] = []
+    related_controls: List[str] = []
+    priority: RiskLevel = RiskLevel.MEDIUM
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ComplianceMapping(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    finding_type: str  # vulnerability type or misconfiguration category
+    cve_pattern: Optional[str] = None  # regex pattern for CVE matching
+    compliance_controls: List[Dict[str, Any]]  # [{framework: "", control_id: "", relevance_score: 0.9}]
+    mapping_confidence: float = 0.0  # 0.0-1.0 confidence in mapping accuracy
+    business_impact: Optional[str] = None
+    remediation_priority: RiskLevel = RiskLevel.MEDIUM
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ComplianceAssessment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    organization_id: str
+    framework: ComplianceFramework
+    assessment_name: str
+    scope_description: str
+    assets_in_scope: List[str] = []
+    control_assessments: List[Dict[str, Any]] = []  # [{control_id: "", status: "", evidence: ""}]
+    overall_score: float = 0.0  # percentage compliance
+    gaps_identified: List[Dict[str, Any]] = []
+    remediation_plan: Optional[str] = None
+    assessor: Optional[str] = None
+    assessment_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    next_assessment_due: Optional[datetime] = None
+    status: str = "in_progress"  # draft, in_progress, completed, approved
+
+# === RISK-BASED PRIORITIZATION ===
+
+class RiskFactor(BaseModel):
+    factor_name: str
+    weight: float  # 0.0-1.0
+    value: float   # 0.0-1.0
+    description: Optional[str] = None
+
+class RiskAssessment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    finding_id: str
+    asset_id: str
+    cvss_score: Optional[float] = None
+    epss_score: Optional[float] = None  # Exploit Prediction Scoring System
+    kev_listed: bool = False  # CISA Known Exploited Vulnerabilities
+    asset_criticality: RiskLevel = RiskLevel.MEDIUM
+    business_impact_score: float = 0.0
+    exploit_likelihood: float = 0.0
+    environmental_factors: List[RiskFactor] = []
+    compensating_controls: List[str] = []
+    final_risk_score: float = 0.0
+    risk_category: RiskLevel = RiskLevel.MEDIUM
+    justification: Optional[str] = None
+    calculated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# === AUTOMATED REMEDIATION ===
+
+class RemediationType(str, Enum):
+    ANSIBLE = "ansible"
+    TERRAFORM = "terraform"
+    POWERSHELL = "powershell"
+    BASH = "bash"
+    MANUAL = "manual"
+    API_CALL = "api_call"
+
+class RemediationTemplate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: str
+    remediation_type: RemediationType
+    template_content: str  # Jinja2 template
+    supported_platforms: List[str] = []  # ["linux", "windows", "cloud"]
+    required_parameters: List[Dict[str, Any]] = []
+    validation_commands: List[str] = []
+    rollback_commands: List[str] = []
+    estimated_duration: Optional[int] = None  # minutes
+    risk_level: RiskLevel = RiskLevel.MEDIUM
+    requires_approval: bool = True
+    tags: List[str] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AutomatedRemediation(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    finding_id: str
+    template_id: str
+    target_systems: List[str]
+    remediation_script: str  # Generated from template
+    parameters: Dict[str, Any] = {}
+    execution_status: RemediationStatus = RemediationStatus.PENDING
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    execution_log: List[Dict[str, Any]] = []  # [{timestamp, level, message, system}]
+    success_rate: float = 0.0  # percentage of successful executions
+    rollback_available: bool = False
+    approval_required: bool = True
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+
+# === CONTINUOUS MONITORING ===
+
+class MonitoringAgent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    asset_id: str
+    agent_version: str
+    platform: str  # linux, windows, container
+    deployment_method: str  # agent, agentless, api
+    status: str = "active"  # active, inactive, error
+    last_checkin: Optional[datetime] = None
+    capabilities: List[str] = []  # ["vulnerability_scan", "config_monitor", "file_integrity"]
+    configuration: Dict[str, Any] = {}
+    installed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MonitoringData(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    agent_id: str
+    asset_id: str
+    data_type: str  # "vulnerability", "configuration", "file_integrity", "process", "network"
+    data_payload: Dict[str, Any]
+    collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    processed: bool = False
+    alerts_generated: List[str] = []
+
+# === INTEGRATION APIS ===
+
+class IntegrationType(str, Enum):
+    SIEM = "siem"
+    TICKETING = "ticketing" 
+    CLOUD = "cloud"
+    NOTIFICATION = "notification"
+    IDENTITY = "identity"
+
+class IntegrationConfig(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    integration_type: IntegrationType
+    provider: str  # "splunk", "elk", "jira", "servicenow", "aws", "azure", "gcp"
+    configuration: Dict[str, Any] = {}  # provider-specific config
+    authentication: Dict[str, Any] = {}  # credentials, tokens, etc.
+    enabled: bool = True
+    sync_frequency: Optional[int] = None  # minutes
+    last_sync: Optional[datetime] = None
+    sync_status: str = "healthy"  # healthy, error, disabled
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class IntegrationEvent(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    integration_id: str
+    event_type: str  # "finding_created", "remediation_completed", "compliance_gap"
+    payload: Dict[str, Any]
+    external_id: Optional[str] = None  # ID in external system
+    sync_status: str = "pending"  # pending, success, failed
+    retry_count: int = 0
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    synced_at: Optional[datetime] = None
+
+# === MULTI-TENANT SUPPORT ===
+
+class Organization(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    display_name: str
+    domain: Optional[str] = None
+    subscription_tier: str = "free"  # free, professional, enterprise
+    max_assets: Optional[int] = None
+    max_users: Optional[int] = None
+    features_enabled: List[str] = []
+    compliance_frameworks: List[ComplianceFramework] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: str
+    organization_id: str
+    role: str = "analyst"  # admin, manager, analyst, viewer
+    permissions: List[str] = []
+    last_login: Optional[datetime] = None
+    active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MSPClient(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    msp_organization_id: str  # MSP's organization ID
+    client_organization_id: str  # Client's organization ID
+    client_name: str
+    service_level: str = "basic"  # basic, premium, enterprise
+    billing_contact: Optional[str] = None
+    technical_contact: Optional[str] = None
+    asset_allocation: Optional[int] = None
+    compliance_requirements: List[ComplianceFramework] = []
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Enhanced LLM Integration
 class VulnAnalyzer:
     def __init__(self):
