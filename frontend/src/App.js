@@ -225,14 +225,21 @@ const Navigation = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${
                   isActive 
                     ? 'bg-red-600 text-white' 
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                 }`}
               >
-                <Icon className="h-5 w-5" />
-                {item.label}
+                <div className="flex items-center gap-3">
+                  <Icon className="h-5 w-5" />
+                  {item.label}
+                </div>
+                {item.isNew && (
+                  <Badge variant="secondary" className="bg-green-500 text-white text-xs px-2 py-0.5">
+                    NEW
+                  </Badge>
+                )}
               </Link>
             );
           })}
