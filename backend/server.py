@@ -1359,6 +1359,778 @@ async def get_enhanced_dashboard_stats():
         }
     }
 
+# === NEW COMPREHENSIVE API ENDPOINTS ===
+
+# Import compliance data
+from compliance_data import (
+    get_compliance_controls, get_compliance_mapping, calculate_risk_score,
+    get_remediation_priority, NIST_800_53_CONTROLS, ISO_27001_CONTROLS,
+    HIPAA_CONTROLS, FEDRAMP_CONTROLS, COMPLIANCE_MAPPINGS
+)
+
+# === COMPLIANCE MAPPING ENDPOINTS ===
+
+@api_router.get("/compliance/frameworks")
+async def get_compliance_frameworks():
+    """Get list of supported compliance frameworks"""
+    return {
+        "frameworks": [
+            {
+                "id": "nist_800_53",
+                "name": "NIST 800-53 Rev 5",
+                "description": "NIST Cybersecurity Framework",
+                "controls_count": len(NIST_800_53_CONTROLS)
+            },
+            {
+                "id": "iso_27001", 
+                "name": "ISO 27001:2022",
+                "description": "Information Security Management",
+                "controls_count": len(ISO_27001_CONTROLS)
+            },
+            {
+                "id": "hipaa",
+                "name": "HIPAA Security Rule",
+                "description": "Health Insurance Portability",
+                "controls_count": len(HIPAA_CONTROLS)
+            },
+            {
+                "id": "fedramp",
+                "name": "FedRAMP",
+                "description": "Federal Risk Authorization",
+                "controls_count": len(FEDRAMP_CONTROLS)
+            }
+        ]
+    }
+
+@api_router.get("/compliance/frameworks/{framework_id}/controls")
+async def get_framework_controls(framework_id: str):
+    """Get all controls for a specific compliance framework"""
+    controls = get_compliance_controls(framework_id)
+    if not controls:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    
+    return {
+        "framework": framework_id,
+        "controls": [
+            {
+                "control_id": control_id,
+                "title": control_data["title"],
+                "family": control_data["family"],
+                "description": control_data["description"],
+                "priority": control_data["priority"]
+            }
+            for control_id, control_data in controls.items()
+        ]
+    }
+
+@api_router.post("/compliance/mappings", response_model=ComplianceMapping)
+async def create_compliance_mapping(mapping: ComplianceMapping):
+    """Create a new compliance mapping"""
+    mapping_dict = mapping.dict()
+    await db.compliance_mappings.insert_one(mapping_dict)
+    return mapping
+
+@api_router.get("/compliance/mappings/{finding_type}")
+async def get_compliance_mappings_for_finding(finding_type: str):
+    """Get compliance mappings for a specific finding type"""
+    # First check database for custom mappings
+    db_mappings = await db.compliance_mappings.find_one({"finding_type": finding_type})
+    
+    if db_mappings:
+        return ComplianceMapping(**db_mappings)
+    
+    # Fall back to default mappings
+    default_mappings = get_compliance_mapping(finding_type)
+    if not default_mappings:
+        raise HTTPException(status_code=404, detail="No mappings found for this finding type")
+    
+    return {
+        "finding_type": finding_type,
+        "compliance_controls": default_mappings,
+        "mapping_confidence": 0.8,
+        "source": "default"
+    }
+
+@api_router.post("/compliance/assessments", response_model=ComplianceAssessment)
+async def create_compliance_assessment(assessment: ComplianceAssessment):
+    """Create a new compliance assessment"""
+    assessment_dict = assessment.dict()
+    await db.compliance_assessments.insert_one(assessment_dict)
+    return assessment
+
+@api_router.get("/compliance/assessments", response_model=List[ComplianceAssessment])
+async def get_compliance_assessments(organization_id: Optional[str] = None):
+    """Get compliance assessments"""
+    query = {}
+    if organization_id:
+        query["organization_id"] = organization_id
+    
+    assessments = await db.compliance_assessments.find(query).to_list(length=None)
+    return [ComplianceAssessment(**assessment) for assessment in assessments]
+
+@api_router.get("/compliance/gap-analysis/{framework}")
+async def get_compliance_gap_analysis(framework: str, organization_id: Optional[str] = None):
+    """Perform compliance gap analysis"""
+    # Get all findings
+    findings_query = {}
+    if organization_id:
+        # In multi-tenant setup, filter by organization
+        findings_query["organization_id"] = organization_id
+    
+    findings = await db.findings.find(findings_query).to_list(length=None)
+    
+    # Get framework controls
+    controls = get_compliance_controls(framework)
+    if not controls:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    
+    # Analyze gaps
+    control_coverage = {}
+    for control_id, control_data in controls.items():
+        control_coverage[control_id] = {
+            "control_title": control_data["title"],
+            "control_family": control_data["family"],
+            "priority": control_data["priority"],
+            "findings_count": 0,
+            "critical_findings": 0,
+            "status": "compliant"
+        }
+    
+    # Map findings to controls
+    for finding in findings:
+        finding_type = finding.get("finding_type", "vulnerability")
+        mappings = get_compliance_mapping(finding_type)
+        
+        framework_mappings = mappings.get(framework, [])
+        for mapping in framework_mappings:
+            control_id = mapping["control_id"]
+            if control_id in control_coverage:
+                control_coverage[control_id]["findings_count"] += 1
+                if finding.get("severity") == "critical":
+                    control_coverage[control_id]["critical_findings"] += 1
+                
+                # Update status based on findings
+                if control_coverage[control_id]["critical_findings"] > 0:
+                    control_coverage[control_id]["status"] = "non_compliant"
+                elif control_coverage[control_id]["findings_count"] > 0:
+                    control_coverage[control_id]["status"] = "partial"
+    
+    # Calculate overall compliance score
+    total_controls = len(controls)
+    compliant_controls = sum(1 for c in control_coverage.values() if c["status"] == "compliant")
+    compliance_score = (compliant_controls / total_controls) * 100 if total_controls > 0 else 0
+    
+    return {
+        "framework": framework,
+        "organization_id": organization_id,
+        "compliance_score": round(compliance_score, 2),
+        "total_controls": total_controls,
+        "compliant_controls": compliant_controls,
+        "non_compliant_controls": sum(1 for c in control_coverage.values() if c["status"] == "non_compliant"),
+        "partial_compliance": sum(1 for c in control_coverage.values() if c["status"] == "partial"),
+        "control_details": control_coverage,
+        "recommendations": [
+            "Address all critical findings immediately",
+            "Implement compensating controls for partial compliance",
+            "Regular compliance monitoring and assessment"
+        ]
+    }
+
+# === RISK-BASED PRIORITIZATION ENDPOINTS ===
+
+@api_router.post("/risk/assessments", response_model=RiskAssessment)
+async def create_risk_assessment(assessment: RiskAssessment):
+    """Create a new risk assessment"""
+    assessment_dict = assessment.dict()
+    await db.risk_assessments.insert_one(assessment_dict)
+    return assessment
+
+@api_router.get("/risk/assessments/{finding_id}", response_model=RiskAssessment)
+async def get_risk_assessment(finding_id: str):
+    """Get risk assessment for a finding"""
+    assessment = await db.risk_assessments.find_one({"finding_id": finding_id})
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Risk assessment not found")
+    return RiskAssessment(**assessment)
+
+@api_router.post("/risk/calculate")
+async def calculate_comprehensive_risk(
+    finding_id: str,
+    cvss_score: Optional[float] = None,
+    epss_score: Optional[float] = None,
+    kev_listed: bool = False,
+    asset_criticality: str = "medium",
+    business_impact: str = "medium",
+    compensating_controls: List[str] = []
+):
+    """Calculate comprehensive risk score for a finding"""
+    
+    # Get finding details
+    finding = await db.findings.find_one({"id": finding_id})
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    
+    # Get asset details for context
+    asset = await db.assets.find_one({"id": finding["asset_id"]})
+    
+    # Use provided values or extract from finding
+    if cvss_score is None and finding.get("cve_ids"):
+        # In a real implementation, you'd fetch CVSS from NVD API
+        cvss_score = 7.5  # Mock value
+    
+    if epss_score is None and finding.get("cve_ids"):
+        # In a real implementation, you'd fetch EPSS from FIRST API
+        epss_score = 0.3  # Mock value
+    
+    # Calculate risk score
+    risk_score = calculate_risk_score(
+        cvss_score=cvss_score or 0.0,
+        epss_score=epss_score or 0.0,
+        kev_listed=kev_listed,
+        asset_criticality=asset.get("criticality", "medium") if asset else asset_criticality,
+        business_impact=business_impact,
+        compensating_controls=compensating_controls
+    )
+    
+    # Create risk assessment
+    risk_assessment = RiskAssessment(
+        finding_id=finding_id,
+        asset_id=finding["asset_id"],
+        cvss_score=cvss_score,
+        epss_score=epss_score,
+        kev_listed=kev_listed,
+        asset_criticality=RiskLevel(asset_criticality),
+        business_impact_score=risk_score,
+        exploit_likelihood=epss_score or 0.0,
+        compensating_controls=compensating_controls,
+        final_risk_score=risk_score,
+        risk_category=RiskLevel(get_remediation_priority(risk_score)),
+        justification=f"Risk calculated based on CVSS: {cvss_score}, EPSS: {epss_score}, Asset Criticality: {asset_criticality}"
+    )
+    
+    # Save to database
+    await db.risk_assessments.insert_one(risk_assessment.dict())
+    
+    return {
+        "finding_id": finding_id,
+        "risk_score": risk_score,
+        "risk_category": get_remediation_priority(risk_score),
+        "priority_order": int(risk_score * 100),
+        "factors": {
+            "cvss_score": cvss_score,
+            "epss_score": epss_score,
+            "kev_listed": kev_listed,
+            "asset_criticality": asset_criticality,
+            "business_impact": business_impact,
+            "compensating_controls_count": len(compensating_controls)
+        },
+        "recommendations": [
+            f"Priority: {get_remediation_priority(risk_score).upper()}",
+            "Address within recommended SLA timeframe",
+            "Consider implementing compensating controls if immediate remediation is not possible"
+        ]
+    }
+
+@api_router.get("/risk/prioritized-findings")
+async def get_prioritized_findings(
+    organization_id: Optional[str] = None,
+    limit: int = 50,
+    severity_filter: Optional[str] = None
+):
+    """Get findings prioritized by risk score"""
+    
+    # Build query
+    query = {}
+    if organization_id:
+        query["organization_id"] = organization_id
+    if severity_filter:
+        query["severity"] = severity_filter
+    
+    # Get findings with risk assessments
+    pipeline = [
+        {"$match": query},
+        {
+            "$lookup": {
+                "from": "risk_assessments",
+                "localField": "id",
+                "foreignField": "finding_id",
+                "as": "risk_assessment"
+            }
+        },
+        {
+            "$addFields": {
+                "risk_score": {
+                    "$ifNull": [{"$arrayElemAt": ["$risk_assessment.final_risk_score", 0]}, 0.5]
+                }
+            }
+        },
+        {"$sort": {"risk_score": -1}},
+        {"$limit": limit}
+    ]
+    
+    findings = await db.findings.aggregate(pipeline).to_list(length=None)
+    
+    return {
+        "prioritized_findings": [
+            {
+                "id": finding["id"],
+                "title": finding["title"],
+                "severity": finding["severity"],
+                "risk_score": finding.get("risk_score", 0.5),
+                "asset_id": finding["asset_id"],
+                "finding_type": finding["finding_type"],
+                "cve_ids": finding.get("cve_ids", []),
+                "priority_rank": idx + 1
+            }
+            for idx, finding in enumerate(findings)
+        ],
+        "total_findings": len(findings),
+        "prioritization_criteria": [
+            "CVSS Base Score",
+            "EPSS Exploit Likelihood", 
+            "Asset Business Criticality",
+            "CISA KEV Catalog Status",
+            "Compensating Controls"
+        ]
+    }
+
+# === ONE-CLICK REMEDIATION ENDPOINTS ===
+
+@api_router.post("/remediation/templates", response_model=RemediationTemplate)
+async def create_remediation_template(template: RemediationTemplate):
+    """Create a new remediation template"""
+    template_dict = template.dict()
+    await db.remediation_templates.insert_one(template_dict)
+    return template
+
+@api_router.get("/remediation/templates", response_model=List[RemediationTemplate])
+async def get_remediation_templates(
+    remediation_type: Optional[str] = None,
+    platform: Optional[str] = None
+):
+    """Get remediation templates"""
+    query = {}
+    if remediation_type:
+        query["remediation_type"] = remediation_type
+    if platform:
+        query["supported_platforms"] = platform
+    
+    templates = await db.remediation_templates.find(query).to_list(length=None)
+    return [RemediationTemplate(**template) for template in templates]
+
+@api_router.post("/remediation/generate/{remediation_type}")
+async def generate_remediation_script(
+    remediation_type: str,
+    finding_id: str,
+    target_systems: List[str],
+    parameters: Dict[str, Any] = {}
+):
+    """Generate one-click remediation script"""
+    
+    # Get finding details
+    finding = await db.findings.find_one({"id": finding_id})
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+    
+    # Get appropriate template
+    template = await db.remediation_templates.find_one({
+        "remediation_type": remediation_type,
+        "tags": {"$in": [finding.get("category", "").lower(), finding.get("finding_type")]}
+    })
+    
+    if not template:
+        # Generate template dynamically using AI
+        analyzer = VulnAnalyzer()
+        
+        prompt = f"""
+        Generate a {remediation_type.upper()} remediation script for:
+        
+        Finding: {finding['title']}
+        Description: {finding['description']}
+        Type: {finding.get('finding_type')}
+        CVEs: {', '.join(finding.get('cve_ids', []))}
+        Target Systems: {', '.join(target_systems)}
+        
+        Requirements:
+        1. Safe, production-ready script
+        2. Include validation checks
+        3. Add rollback procedures
+        4. Use best practices for {remediation_type}
+        5. Include comments and documentation
+        
+        Return only the script content, properly formatted.
+        """
+        
+        response = await analyzer.llm.chat(UserMessage(content=prompt))
+        generated_script = response.content
+    else:
+        # Use existing template
+        from jinja2 import Template
+        template_obj = Template(template["template_content"])
+        generated_script = template_obj.render(
+            finding=finding,
+            target_systems=target_systems,
+            **parameters
+        )
+    
+    # Create automated remediation entry
+    auto_remediation = AutomatedRemediation(
+        finding_id=finding_id,
+        template_id=template["id"] if template else "ai_generated",
+        target_systems=target_systems,
+        remediation_script=generated_script,
+        parameters=parameters,
+        approval_required=True if finding.get("severity") in ["critical", "high"] else False
+    )
+    
+    await db.automated_remediations.insert_one(auto_remediation.dict())
+    
+    return {
+        "remediation_id": auto_remediation.id,
+        "remediation_type": remediation_type,
+        "script_content": generated_script,
+        "target_systems": target_systems,
+        "requires_approval": auto_remediation.approval_required,
+        "estimated_duration": template.get("estimated_duration", 30) if template else 30,
+        "validation_commands": template.get("validation_commands", []) if template else [],
+        "rollback_available": bool(template.get("rollback_commands", [])) if template else False
+    }
+
+@api_router.post("/remediation/execute/{remediation_id}")
+async def execute_remediation(
+    remediation_id: str,
+    approved_by: Optional[str] = None,
+    dry_run: bool = False
+):
+    """Execute one-click remediation"""
+    
+    # Get remediation details
+    remediation = await db.automated_remediations.find_one({"id": remediation_id})
+    if not remediation:
+        raise HTTPException(status_code=404, detail="Remediation not found")
+    
+    # Check approval requirements
+    if remediation["approval_required"] and not approved_by:
+        raise HTTPException(status_code=403, detail="Approval required for this remediation")
+    
+    # Update remediation status
+    update_data = {
+        "execution_status": RemediationStatus.IN_PROGRESS,
+        "started_at": datetime.now(timezone.utc)
+    }
+    
+    if approved_by:
+        update_data.update({
+            "approved_by": approved_by,
+            "approved_at": datetime.now(timezone.utc)
+        })
+    
+    await db.automated_remediations.update_one(
+        {"id": remediation_id},
+        {"$set": update_data}
+    )
+    
+    # In a real implementation, you would execute the script on target systems
+    # For now, simulate execution
+    execution_results = []
+    success_count = 0
+    
+    for system in remediation["target_systems"]:
+        if dry_run:
+            result = {
+                "system": system,
+                "status": "dry_run_success",
+                "message": "Dry run completed successfully - no changes made",
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        else:
+            # Simulate execution (in real implementation, use SSH/WinRM/API)
+            import random
+            success = random.choice([True, True, True, False])  # 75% success rate
+            
+            if success:
+                success_count += 1
+                result = {
+                    "system": system,
+                    "status": "success",
+                    "message": "Remediation applied successfully",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            else:
+                result = {
+                    "system": system,
+                    "status": "failed",
+                    "message": "Failed to apply remediation - check system logs",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+        
+        execution_results.append(result)
+    
+    # Calculate success rate
+    success_rate = (success_count / len(remediation["target_systems"])) * 100
+    
+    # Update remediation with results
+    final_status = RemediationStatus.COMPLETED if success_rate > 80 else RemediationStatus.FAILED
+    
+    await db.automated_remediations.update_one(
+        {"id": remediation_id},
+        {
+            "$set": {
+                "execution_status": final_status,
+                "completed_at": datetime.now(timezone.utc),
+                "execution_log": execution_results,
+                "success_rate": success_rate
+            }
+        }
+    )
+    
+    return {
+        "remediation_id": remediation_id,
+        "execution_status": final_status,
+        "success_rate": success_rate,
+        "results": execution_results,
+        "summary": {
+            "total_systems": len(remediation["target_systems"]),
+            "successful": success_count,
+            "failed": len(remediation["target_systems"]) - success_count,
+            "dry_run": dry_run
+        }
+    }
+
+# === CONTINUOUS MONITORING ENDPOINTS ===
+
+@api_router.post("/monitoring/agents", response_model=MonitoringAgent)
+async def register_monitoring_agent(agent: MonitoringAgent):
+    """Register a new monitoring agent"""
+    agent_dict = agent.dict()
+    await db.monitoring_agents.insert_one(agent_dict)
+    return agent
+
+@api_router.get("/monitoring/agents", response_model=List[MonitoringAgent])
+async def get_monitoring_agents(status: Optional[str] = None):
+    """Get monitoring agents"""
+    query = {}
+    if status:
+        query["status"] = status
+    
+    agents = await db.monitoring_agents.find(query).to_list(length=None)
+    return [MonitoringAgent(**agent) for agent in agents]
+
+@api_router.post("/monitoring/data")
+async def ingest_monitoring_data(data: MonitoringData):
+    """Ingest monitoring data from agents"""
+    data_dict = data.dict()
+    await db.monitoring_data.insert_one(data_dict)
+    
+    # Process data for alerts (simplified)
+    alerts_generated = []
+    
+    if data.data_type == "vulnerability" and data.data_payload.get("severity") == "critical":
+        alerts_generated.append("critical_vulnerability_detected")
+    
+    if data.data_type == "configuration" and data.data_payload.get("baseline_deviation"):
+        alerts_generated.append("configuration_drift_detected")
+    
+    # Update monitoring data with alerts
+    if alerts_generated:
+        await db.monitoring_data.update_one(
+            {"id": data.id},
+            {"$set": {"alerts_generated": alerts_generated}}
+        )
+    
+    return {
+        "data_id": data.id,
+        "processed": True,
+        "alerts_generated": alerts_generated
+    }
+
+@api_router.get("/monitoring/dashboard")
+async def get_monitoring_dashboard():
+    """Get monitoring dashboard data"""
+    
+    # Get agent statistics
+    total_agents = await db.monitoring_agents.count_documents({})
+    active_agents = await db.monitoring_agents.count_documents({"status": "active"})
+    
+    # Get recent monitoring data
+    recent_data = await db.monitoring_data.find().sort("collected_at", -1).limit(100).to_list(length=None)
+    
+    # Calculate metrics
+    vulnerability_alerts = len([d for d in recent_data if "critical_vulnerability_detected" in d.get("alerts_generated", [])])
+    config_drift_alerts = len([d for d in recent_data if "configuration_drift_detected" in d.get("alerts_generated", [])])
+    
+    return {
+        "agent_statistics": {
+            "total_agents": total_agents,
+            "active_agents": active_agents,
+            "inactive_agents": total_agents - active_agents,
+            "health_percentage": (active_agents / total_agents) * 100 if total_agents > 0 else 0
+        },
+        "recent_alerts": {
+            "vulnerability_alerts": vulnerability_alerts,
+            "configuration_drift": config_drift_alerts,
+            "total_alerts": vulnerability_alerts + config_drift_alerts
+        },
+        "monitoring_coverage": {
+            "assets_monitored": active_agents,
+            "data_points_collected": len(recent_data),
+            "collection_rate": len(recent_data) / max(active_agents, 1)
+        }
+    }
+
+# === INTEGRATION API ENDPOINTS ===
+
+@api_router.post("/integrations", response_model=IntegrationConfig)
+async def create_integration(integration: IntegrationConfig):
+    """Create a new integration configuration"""
+    integration_dict = integration.dict()
+    # Encrypt sensitive authentication data in real implementation
+    await db.integration_configs.insert_one(integration_dict)
+    return integration
+
+@api_router.get("/integrations", response_model=List[IntegrationConfig])
+async def get_integrations(integration_type: Optional[str] = None):
+    """Get integration configurations"""
+    query = {}
+    if integration_type:
+        query["integration_type"] = integration_type
+    
+    integrations = await db.integration_configs.find(query).to_list(length=None)
+    # Remove sensitive authentication data from response
+    for integration in integrations:
+        integration["authentication"] = {"configured": bool(integration.get("authentication"))}
+    
+    return [IntegrationConfig(**integration) for integration in integrations]
+
+@api_router.post("/integrations/{integration_id}/sync")
+async def trigger_integration_sync(integration_id: str):
+    """Manually trigger integration synchronization"""
+    
+    integration = await db.integration_configs.find_one({"id": integration_id})
+    if not integration:
+        raise HTTPException(status_code=404, detail="Integration not found")
+    
+    # In real implementation, this would trigger actual sync with external systems
+    # For now, simulate sync process
+    
+    sync_results = {
+        "integration_id": integration_id,
+        "sync_started": datetime.now(timezone.utc).isoformat(),
+        "status": "in_progress"
+    }
+    
+    # Update last sync time
+    await db.integration_configs.update_one(
+        {"id": integration_id},
+        {
+            "$set": {
+                "last_sync": datetime.now(timezone.utc),
+                "sync_status": "healthy"
+            }
+        }
+    )
+    
+    return sync_results
+
+@api_router.get("/integrations/events")
+async def get_integration_events(
+    integration_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    limit: int = 100
+):
+    """Get integration events"""
+    query = {}
+    if integration_id:
+        query["integration_id"] = integration_id
+    if event_type:
+        query["event_type"] = event_type
+    
+    events = await db.integration_events.find(query).sort("created_at", -1).limit(limit).to_list(length=None)
+    return [IntegrationEvent(**event) for event in events]
+
+# === MULTI-TENANT ENDPOINTS ===
+
+@api_router.post("/organizations", response_model=Organization)
+async def create_organization(organization: Organization):
+    """Create a new organization"""
+    org_dict = organization.dict()
+    await db.organizations.insert_one(org_dict)
+    return organization
+
+@api_router.get("/organizations", response_model=List[Organization])
+async def get_organizations():
+    """Get all organizations"""
+    organizations = await db.organizations.find().to_list(length=None)
+    return [Organization(**org) for org in organizations]
+
+@api_router.post("/organizations/{org_id}/users", response_model=User)
+async def create_user(org_id: str, user: User):
+    """Create a new user in an organization"""
+    # Verify organization exists
+    org = await db.organizations.find_one({"id": org_id})
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    
+    user.organization_id = org_id
+    user_dict = user.dict()
+    await db.users.insert_one(user_dict)
+    return user
+
+@api_router.get("/organizations/{org_id}/dashboard")
+async def get_organization_dashboard(org_id: str):
+    """Get organization-specific dashboard"""
+    
+    # Get organization assets and findings
+    assets = await db.assets.find({"organization_id": org_id}).to_list(length=None)
+    findings = await db.findings.find({"organization_id": org_id}).to_list(length=None)
+    
+    # Calculate metrics
+    critical_findings = len([f for f in findings if f.get("severity") == "critical"])
+    high_findings = len([f for f in findings if f.get("severity") == "high"])
+    
+    return {
+        "organization_id": org_id,
+        "metrics": {
+            "total_assets": len(assets),
+            "total_findings": len(findings),
+            "critical_findings": critical_findings,
+            "high_findings": high_findings,
+            "risk_score": (critical_findings * 10 + high_findings * 5) / max(len(assets), 1)
+        },
+        "asset_breakdown": {
+            "servers": len([a for a in assets if a.get("asset_type") == "server"]),
+            "workstations": len([a for a in assets if a.get("asset_type") == "workstation"]),
+            "network_devices": len([a for a in assets if a.get("asset_type") == "network"]),
+            "cloud_resources": len([a for a in assets if a.get("asset_type") == "cloud"])
+        }
+    }
+
+@api_router.post("/msp/clients", response_model=MSPClient)
+async def create_msp_client(client: MSPClient):
+    """Create a new MSP client relationship"""
+    client_dict = client.dict()
+    await db.msp_clients.insert_one(client_dict)
+    return client
+
+@api_router.get("/msp/{msp_org_id}/clients")
+async def get_msp_clients(msp_org_id: str):
+    """Get all clients for an MSP"""
+    clients = await db.msp_clients.find({"msp_organization_id": msp_org_id}).to_list(length=None)
+    
+    # Enrich with organization data
+    enriched_clients = []
+    for client in clients:
+        org = await db.organizations.find_one({"id": client["client_organization_id"]})
+        if org:
+            client["organization_details"] = {
+                "name": org["name"],
+                "domain": org.get("domain"),
+                "subscription_tier": org.get("subscription_tier")
+            }
+        enriched_clients.append(client)
+    
+    return enriched_clients
+
 # Helper function for enhanced mock findings
 async def generate_enhanced_mock_findings(targets: List[str], scan_id: str, include_misconfigs: bool = True) -> List[Finding]:
     """Generate realistic mock vulnerability and misconfiguration findings"""
